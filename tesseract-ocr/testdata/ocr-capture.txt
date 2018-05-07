@@ -1,0 +1,8 @@
+OCR output:
+This wiki provide simple example how to use tesseracteocr API (v3.02.02) in C++. It is expected that
+tesseracteocr is correctly installed including all dependecies. It is expected that user is familiar with
+C++, compiling and linking program on their platform, though basic compilation examples are
+included for beginners with Linux.
+
+More details about tesseracteocr API can found at baseapi.h
+

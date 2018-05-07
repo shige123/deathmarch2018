@@ -1,0 +1,48 @@
+OCR output:
+2 a Chapter One Fundamentals of Quantitative Design and Analysis
+1.1 Introduction
+Computer technology has made incredible progress in the roughly 65 years since
+the first general-purpose electronic computer was created. Today, less than $500
+will purchase a mobile computer that has more performance, more main memory,
+and more disk storage than a computer bought in 1985 for $1 million. This rapid
+improvement has come both from advances in the technology used to build com-
+puters and from innovations in computer design.
+Although technological improvements have been fairly steady, progress aris—
+ing from better computer architectures has been much less consistent. During the
+first 25 years of electronic computers, both forces made a major contribution,
+delivering performance improvement of about 25% per year. The late 19705 saw
+the emergence of the microprocessor. The ability of the microprocessor to ride
+the improvements in integrated circuit technology led to a higher rate of perfor-
+mance improvement—roughly 35% growth per year.
+This growth rate, combined with the cost advantages of a mass-produced
+microprocessor, led to an increasing fraction of the computer business being
+based on microprocessors. In addition, two significant changes in the computer
+marketplace made it easier than ever before to succeed commercially with a new
+architecture. First, the virtual elimination of assembly language programming
+reduced the need for object—code compatibility. Second, the creation of standard-
+ized, vendor-independent operating systems, such as UNIX and its clone, Linux,
+lowered the cost and risk of bringing out a new architecture.
+These changes made it possible to develop successfully a new set of architec—
+tures with simpler instructions, called RISC (Reduced Instruction Set Computer)
+architectures, in the early 1980s. The RISC-based machines focused the attention
+of designers on two critical performance techniques, the exploitation of instruction—
+level parallelism (initially through pipelining and later through multiple instruction
+. issue) and the use of caches (initially in simple forms and later using more sophisti—
+cated organizations and optimizations).
+The RISC-based computers raised the performance bar, forcing prior archi—
+tectures to keep up or disappear. The Digital Equipment Vax could not, and so it
+was replaced by a RISC architecture. Intel rose to the challenge, primarily by
+translating 80x86 instructions into RISC-like instructions internally, allowing it
+to adopt many of the innovations first pioneered in the RISC designs. As transis-
+tor counts soared in the late 1990s, the hardware overhead of translating the more
+complex x86 architecture became negligible. In low-end applications, such as
+cell phones, the cost in power and silicon area of the x86-translation overhead ‘
+helped lead to a RISC architecture, ARM, becoming dominant. 1
+Figure 1.1 shows that the combination of architectural and organizational i
+enhancements led to 17 years of sustained growth in performance at an annual
+rate of over 50%-——a rate that is unprecedented in the computer industry.
+The effect of this dramatic growth rate in the 20th century has been fourfold.
+First, it has significantly enhanced the capability available to computer users. For ‘
+many applications, the hi ghest-performance microprocessors of today outper-
+form the supercomputer of less than 10 years ago. ‘
+
