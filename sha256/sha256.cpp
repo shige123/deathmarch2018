@@ -1,6 +1,9 @@
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
-#define N 1//64byteãƒ”ãƒƒã‚¿ãƒªã‚’1å€‹
+//“®“IŠm•Û‚Í‚Ü‚¾
+#define N 1024
 
 const unsigned int K[64]=
   {
@@ -22,7 +25,7 @@ const unsigned int K[64]=
 	0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
   };
 
-//åŸºæœ¬çš„ãªæ“ä½œ
+//Šî–{“I‚È‘€ì
 unsigned int rotr(unsigned int x, unsigned int n)
 {
   return (x >> n)|(x << (32 - n));
@@ -33,7 +36,7 @@ unsigned int shr(unsigned int x, unsigned int n)
   return (x >> n);
 }
 
-//å„é–¢æ•°
+//ŠeŠÖ”
 unsigned int ch(unsigned int x,unsigned int y,unsigned int z)
 {
   return (x & y)^(~x & z);
@@ -63,33 +66,68 @@ unsigned int small_sigma1(unsigned int x)
     return rotr(x,17) ^ rotr(x, 19) ^ shr(x,10);
 }
 
+//int main(int argc, char *argv[])
 int main(void)
 {
   int i,j,t;
+  unsigned int l_byte,l_bit,k;
+  unsigned int one;
+  unsigned int kn,km;
+  int n;
+
   unsigned int a,b,c,d,e,f,g,h,t1,t2;
   unsigned int W[64];
-  unsigned int H[8][65];
 
+  unsigned int H[N][8];
   unsigned int M[N][16];
-  //åˆæœŸåŒ–
-  for(i=0;i<N;i++){
-	  for(j=0;j<16;j++){
-		M[i][j]= 0;
+
+  unsigned int tmp1,tmp2,tmp3,tmp4;
+  //“K“–‚È“ü—Í
+  char *s = "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD";
+  
+  //“ü—ÍƒƒbƒZ[ƒW‚Ì’·‚³[Byte]‚ğæ“¾
+  l_byte = strlen(s);
+  l_bit = l_byte * 8;
+  //  k = 448 - (l+1); // “ü—Íƒf[ƒ^’·‚ª447bit‚ğ’´‚¦‚È‚¢‚Æ‚«ŒÀ’è
+
+  //ƒƒbƒZ[ƒWƒuƒƒbƒN”
+  //"“ü—ÍƒoƒCƒg”(l)"+"0x8000(1byte)"+ "length(8byte)"
+  n = ((l_byte + 1 + 8) / 64) + 1;
+  one = 0x80000000 >> (l_byte%4)*8;
+
+  memset(M,0,64*4*n);
+  memcpy(M,s,l_byte);
+  
+  //ƒGƒ“ƒfƒBƒAƒ“‘Î‰
+  for(i=0;i<n;i++){
+	  for(j=0;j<64;j++){
+		  tmp1 = M[i][j] & 0x000000ff; //4byte–Ú‚ğˆê‘Ò”ğ
+		  tmp2 = M[i][j] & 0x0000ff00; //3byte–Ú‚ğˆê‘Ò”ğ
+		  tmp3 = M[i][j] & 0x00ff0000; //2byte–Ú‚ğˆê‘Ò”ğ
+		  tmp4 = M[i][j] & 0xff000000; //1byte–Ú‚ğˆê‘Ò”ğ
+		  M[i][j] = (tmp1 << 24) + (tmp2 << 8) + (tmp3 >> 8) + (tmp4 >> 24);
 	  }
   }
-  M[0][0]=0x80000000;
 
-  
+  kn = n-1;
+  km = (l_byte % 64)/4;
+  M[kn][km] = M[kn][km] + one;
+
+  memset(&M[kn][km+1],0,64-8);
+  M[kn][15]=l_bit;
+//  printf("%x\n",M[0][0]);
+
+
   H[0][0] = 0x6a09e667;
-  H[1][0] = 0xbb67ae85;
-  H[2][0] = 0x3c6ef372;
-  H[3][0] = 0xa54ff53a;
-  H[4][0] = 0x510e527f;
-  H[5][0] = 0x9b05688c;
-  H[6][0] = 0x1f83d9ab;
-  H[7][0] = 0x5be0cd19;
+  H[0][1] = 0xbb67ae85;
+  H[0][2] = 0x3c6ef372;
+  H[0][3] = 0xa54ff53a;
+  H[0][4] = 0x510e527f;
+  H[0][5] = 0x9b05688c;
+  H[0][6] = 0x1f83d9ab;
+  H[0][7] = 0x5be0cd19;
 
- for(i=1;i<=N;i++){
+ for(i=1;i<=n;i++){
 
 	for(t=0;t<=63;t++){
 	  if((0<=t) && (t<=15)){
@@ -100,14 +138,14 @@ int main(void)
 	  }
 	}
 	
-	a = H[0][i-1];
-	b = H[1][i-1];
-	c = H[2][i-1];
-	d = H[3][i-1];
-	e = H[4][i-1];
-	f = H[5][i-1];
-	g = H[6][i-1];
-	h = H[7][i-1];
+	a = H[i-1][0];
+	b = H[i-1][1];
+	c = H[i-1][2];
+	d = H[i-1][3];
+	e = H[i-1][4];
+	f = H[i-1][5];
+	g = H[i-1][6];
+	h = H[i-1][7];
 
 	for(t=0;t<=63;t++){
 	  t1 = h + large_sigma1(e) + ch(e,f,g) + K[t] + W[t];
@@ -122,19 +160,17 @@ int main(void)
 	  a = t1 + t2;
 	}
 	
-	H[0][i] = a + H[0][i-1];
-	H[1][i] = b + H[1][i-1];
-	H[2][i] = c + H[2][i-1];
-	H[3][i] = d + H[3][i-1];
-	H[4][i] = e + H[4][i-1];
-	H[5][i] = f + H[5][i-1];
-	H[6][i] = g + H[6][i-1];
-	H[7][i] = h + H[7][i-1];
-						
+	H[i][0] = a + H[i-1][0];
+	H[i][1] = b + H[i-1][1];
+	H[i][2] = c + H[i-1][2];
+	H[i][3] = d + H[i-1][3];
+	H[i][4] = e + H[i-1][4];
+	H[i][5] = f + H[i-1][5];
+	H[i][6] = g + H[i-1][6];
+	H[i][7] = h + H[i-1][7];
  }
 
   printf("M:: %x | %x | %x | %x | %x | %x | %x | %x \n",
-		 H[0][N],H[1][N],H[2][N],H[3][N],H[4][N],H[5][N],H[6][N],H[7][N]);
-
+		 H[n][0],H[n][1],H[n][2],H[n][3],H[n][4],H[n][5],H[n][6],H[n][7]);
   return 0;
 }
