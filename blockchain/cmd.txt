@@ -1,0 +1,2 @@
+g++ server.cpp -o server_cpp -std=c++0x
+
