@@ -39,7 +39,8 @@ public:
         nonce_ =nonce;
         hash_ = GenerateHash();
     }
-private:
+//private:
+public:
     std::string GenerateHash(){
                 //ID、タイムスタンプ、データ、一つ前のハッシュ値から新たなハッシュ値を生成する
         std::string src_str;
@@ -73,13 +74,18 @@ Block CreateGenesisBlock(){
 Block CreateNextBlock(Block last_block,std::string nonce){
     int this_index = last_block.index_ + 1;
     int this_timestamp = time(NULL);
-    std::string this_data = "this is block" + std::to_string(this_index);
+    //std::string this_data = "this is block" + std::to_string(this_index);
+    std::string this_data = std::to_string(this_index);
     std::string this_hash = last_block.hash_;
     std::string this_nonce =nonce;
 
     Block next_block(this_index, this_timestamp, this_data, this_hash,this_nonce);
     return next_block;
 }
+
+
+
+
 //-------------------------
 
 /*void hash(string nonce){
@@ -101,8 +107,11 @@ int client;
 int len;
 int sock;
 
-char buf[32];
+char buf[128];
 int data;
+
+string client_nonce;
+string first_nonce;
 
 std::vector<Block> blockchain; //ブロックを保持していくための動的配列
     int num_blocks = 5; // ブロックを追加する回数
@@ -138,15 +147,42 @@ cout << "Waiting access for two clients..." << "\n";
 cout << "Conneted Clients."<< "\n";
 sendto(sock,"Connected_Server.",17,0,(struct sockaddr*)&addr,sizeof(addr));
 
+//---blockchain
+first_nonce="0000";
+client_nonce=first_nonce;
+new_block = CreateNextBlock(previous_block,client_nonce); // 最後のブロックを引数に取り新たなブロックを生成
+blockchain.push_back(new_block); //ブロックチェーンに追加
+previous_block = new_block;
+std::cout << "a new block has been added to the blcokchain!" << std::endl;
+new_block.CheckBlockInfo();
+///
+
+
 //
 memset(buf, 0, sizeof(buf));
 data = read(sock, buf, sizeof(buf));
 
-string client_nonce;
+std::string  snd_str;
+snd_str=std::to_string(new_block.index_) + std::to_string(new_block.timestamp_) + new_block.data_ + new_block.previous_hash_ ;
+cout<<"block_index"<<snd_str<<endl;
+
+char* cstr = new char[snd_str.size() + 1];
+strcpy(cstr, snd_str.c_str());
+sendto(sock,cstr,snd_str.size()+1,0,(struct sockaddr*)&addr,sizeof(addr));
+
+memset(buf, 0, sizeof(buf));
+data = read(sock, buf, sizeof(buf));
+//string client_nonce;
 client_nonce=buf;
 //printf("%d, %s\n", data, buf);
 cout<<"client_nonce: "<<client_nonce<<endl;
+cout<<"---UPDATE NONCE---"<<client_nonce<<endl;
 //hash(client_nonce);
+
+//nonce の更新
+previous_block.nonce_=client_nonce;
+previous_block.hash_=previous_block.GenerateHash();
+previous_block.CheckBlockInfo();
 
 //---blockchain
 new_block = CreateNextBlock(previous_block,client_nonce); // 最後のブロックを引数に取り新たなブロックを生成
@@ -156,8 +192,34 @@ std::cout << "a new block has been added to the blcokchain!" << std::endl;
 new_block.CheckBlockInfo();
 ///
 
-sendto(sock,"OK.",2,0,(struct sockaddr*)&addr,sizeof(addr));
+delete[] cstr;
 
+//sendto(sock,"OK.",2,0,(struct sockaddr*)&addr,sizeof(addr));
+//----
+snd_str=std::to_string(new_block.index_) + std::to_string(new_block.timestamp_) + new_block.data_ + new_block.previous_hash_ ;
+cout<<"block_index"<<snd_str<<endl;
+
+char* cstr2 = new char[snd_str.size() + 1];
+strcpy(cstr2, snd_str.c_str());
+sendto(sock,cstr2,snd_str.size()+1,0,(struct sockaddr*)&addr,sizeof(addr));
+
+memset(buf, 0, sizeof(buf));
+data = read(sock, buf, sizeof(buf));
+//string client_nonce;
+client_nonce=buf;
+//printf("%d, %s\n", data, buf);
+cout<<"client_nonce: "<<client_nonce<<endl;
+cout<<"---UPDATE NONCE---"<<client_nonce<<endl;
+//hash(client_nonce);
+cout<<"debug1"<<endl;
+//nonce の更新
+previous_block.nonce_=client_nonce;
+previous_block.hash_=previous_block.GenerateHash();
+previous_block.CheckBlockInfo();
+
+
+
+//----
 data = read(sock, buf, sizeof(buf));
 client_nonce=buf;
 
@@ -166,6 +228,8 @@ blockchain.push_back(new_block); //ブロックチェーンに追加
 previous_block = new_block;
 std::cout << "a new block has been added to the blcokchain!" << std::endl;
 new_block.CheckBlockInfo();
+
+delete[] cstr2;
 
 
 }
