@@ -36,22 +36,23 @@ void hash(string nonce){
     cout<<"double_hash:"<<endl<<double_hash<<endl;
 }
 
-
-bool judge_nonce(string src){
-  bool judge=false;
-  int i=0;
-  string judge_str;
-    for(i=0;i<5;i++){
+bool judge_nonce(string src, int zero_count){
+    bool judge=false;
+    int i=0;
+    string judge_str;
+    string zero_count_str;
+    for(i=0;i<zero_count;i++){
         judge_str.push_back(src[i]);
+        zero_count_str.push_back('0');
     }
-    //cout<<"judge"<<judge_str<<endl;
-    if(judge_str=="00000"){
-      judge=true;
+    cout<<"judge"<<judge_str<<endl;
+    if(judge_str==zero_count_str){
+        judge=true;
     }
     return judge;
 }
 
-int calc_nonce(string src){
+int calc_nonce(string src, int zero_count){
     const int N = 1000*1000;
     std::vector<int> v;
     auto start = std::chrono::system_clock::now();
@@ -72,10 +73,28 @@ int calc_nonce(string src){
     cout<<"count"<<count<<endl;
     cout<<"cmp_str<<"<<cmp_str<<endl;
 
+
+    cout<<"CALL calc_nonce: src:"<<src<<endl;
+    string result_str;
+    string cmp_str;
+    int nonce=rand();
+    int count=0;
+    bool hash_judge=false;
+    while (hash_judge==false){
+        nonce=rand();
+        cout<<"nonce:"<<nonce<<endl;
+        cmp_str=src+std::to_string(nonce);
+        picosha2::hash256_hex_string(cmp_str,result_str);
+        count++;
+        hash_judge=judge_nonce(result_str,zero_count);
+    }
+    cout<<"count"<<count<<endl;
+    cout<<"cmp_str<<"<<cmp_str<<endl;
+
     auto end = std::chrono::system_clock::now();       // 計測終了時刻を保存
     auto dur = end - start;        // 要した時間を計算
     auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
-// 要した時間をミリ秒（1/1000秒）に変換して表示
+    // 要した時間をミリ秒（1/1000秒）に変換して表示
     std::cout << msec << " msec \n";
 
     return nonce;
@@ -84,7 +103,7 @@ int calc_nonce(string src){
 
 
 
-int main()
+int main(int argc,char *argv[])
 {
     struct sockaddr_in addr;
     int sock;
@@ -99,7 +118,8 @@ int main()
     /* 接続先指定用構造体の準備 */
     addr.sin_family = AF_INET;
     addr.sin_port = htons(10050);
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    //addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    addr.sin_addr.s_addr = inet_addr(argv[3]);
 
     /* サーバに接続 */
     connect(sock, (struct sockaddr*)&addr, sizeof(addr));
@@ -114,43 +134,28 @@ int main()
 
     sendto(sock,"query.",5,0,(struct sockaddr*)&addr,sizeof(addr));
 
-    memset(buf, 0, sizeof(buf));
-    data = read(sock, buf, sizeof(buf));
-    printf("%d, %s\n", data, buf);
-
+    int block_loop_count;
     string rcv_str;
-    rcv_str=buf;
-    cout<<"rcv_str: "<<rcv_str<<endl;
-    bool t;
-
     int b;
-    b=calc_nonce(rcv_str);
-    cout<<"b:"<<b<<endl;
-    nonce=to_string(b);
+    for(block_loop_count=0;block_loop_count<atoi(argv[2]);block_loop_count++){
+        memset(buf, 0, sizeof(buf));
+        data = read(sock, buf, sizeof(buf));
+        printf("%d, %s\n", data, buf);
 
-    char* cstr = new char[nonce.size() + 1];
-    strcpy(cstr, nonce.c_str());
-    sendto(sock,cstr,nonce.size()+1,0,(struct sockaddr*)&addr,sizeof(addr));
+        //string rcv_str;
+        rcv_str=buf;
+        cout<<"rcv_str: "<<rcv_str<<endl;
 
-    memset(buf, 0, sizeof(buf));
-    data = read(sock, buf, sizeof(buf));
-    printf("%d, %s\n", data, buf);
+        //int b;
+        b=calc_nonce(rcv_str,atoi(argv[1]));
+        cout<<"b:"<<b<<endl;
+        nonce=to_string(b);
 
-    rcv_str=buf;
-    cout<<"rcv_str: "<<rcv_str<<endl;
-
-    b=calc_nonce(rcv_str);
-    cout<<"b:"<<b<<endl;
-    nonce=to_string(b);
-
-    //memset(buf, 0, sizeof(buf));
-    //data = read(sock, buf, sizeof(buf));
-    //printf("%d, %s\n", data, buf);
-    cout<<"debug1"<<endl;
-    strcpy(cstr, nonce.c_str());
-    sendto(sock,cstr,nonce.size()+1,0,(struct sockaddr*)&addr,sizeof(addr));
-    delete[] cstr;
-
+        char* cstr = new char[nonce.size() + 1];
+        strcpy(cstr, nonce.c_str());
+        sendto(sock,cstr,nonce.size()+1,0,(struct sockaddr*)&addr,sizeof(addr));
+        delete[] cstr;
+    }
 
     /* socketの終了 */
     close(sock);
