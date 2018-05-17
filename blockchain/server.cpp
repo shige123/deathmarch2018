@@ -16,10 +16,11 @@
 #include <iomanip>
 #include <bitset>
 
-const int CLIENTNUM = 3;
-const int BUFFER_SIZE = 128;
+#include <chrono>
 
-int dst_socket[CLIENTNUM];
+const int BUFFER_SIZE = 128;
+const int PLAYERNUM = 2;
+int dst_socket[PLAYERNUM];
 
 
 using namespace std;
@@ -55,7 +56,7 @@ public:
         picosha2::hash256_hex_string(src_str, hash_str);
 
 
-        std::cout << "new hash:  " <<hash_str.front() <<std::endl;
+        // std::cout << "new hash:  " <<hash_str.front() <<std::endl;
         return  hash_str;
     }
 
@@ -91,11 +92,10 @@ Block CreateNextBlock(Block last_block, std::string nonce){
 
 //-------------------------
 
-int InitializeSocket(struct sockaddr_in &addr){
-    int client_data_size;
+int InitializeSocket(struct sockaddr_in &addr, int port){
+    int addr_size;
     int sock;
-    int client_addr;
-
+;
     /*ソケットの作成(TCP/IP通信)*/
     sock = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -103,18 +103,17 @@ int InitializeSocket(struct sockaddr_in &addr){
         perror("ERROR opening socket");
         exit(1);
     }
-
     /*ソケットの設定*/
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(10050);
+    addr.sin_port = htons(port);
     addr.sin_addr.s_addr = INADDR_ANY;//どれでも要求を受け付ける
     bind(sock,(struct sockaddr*)&addr, sizeof(addr));
 
     /*TCPクライアントからの接続要求を持てる状態にする*/
     listen(sock,1);
     /*TCPクライアントからの要求を受付*/
-    client_data_size = sizeof(client_addr);
-    sock = accept(sock,(struct sockaddr*)&client_addr, (socklen_t*)&client_data_size);
+    addr_size = sizeof(addr);
+    sock = accept(sock,(struct sockaddr*)&addr, (socklen_t*)&addr_size);
     if(sock<0){
         cout << "Connection Failed. " << "\n";
         exit(1);
@@ -125,112 +124,73 @@ int InitializeSocket(struct sockaddr_in &addr){
 }
 
 int main(){
-    int sock;
+    int sock[PLAYERNUM];
     char buf[BUFFER_SIZE];
     int data;
-    struct sockaddr_in addr;
+    struct sockaddr_in addr[PLAYERNUM];
+    
 
-    InitializeSocket(addr);
-    sendto(sock,"Connected_Server.",17,0,(struct sockaddr*)&addr,sizeof(addr));
-
+    for (int i = 0; i < PLAYERNUM; i++) {
+        sock[i] = InitializeSocket(addr[i], 10050+i);
+        string connect_message("Player");
+        connect_message += to_string(i);
+        cout << "connect_message" << connect_message << endl;
+        sendto(sock[i],connect_message.c_str(), connect_message.size()+1,
+               0,(struct sockaddr*)&addr[i],sizeof(addr[i]));
+    }
     vector<Block> blockchain; //ブロックを保持していくための動的配列
     int num_blocks = 5; // ブロックを追加する回数
     Block previous_block;
-    Block new_block;
-    string client_nonce;
-    string first_nonce;
-
-    blockchain.push_back(CreateGenesisBlock()); // 最初のブロックを用意、追加
-    previous_block = blockchain[0];
-
-//---blockchain
-    first_nonce="0000";
-    client_nonce=first_nonce;
-    new_block = CreateNextBlock(previous_block,client_nonce); // 最後のブロックを引数に取り新たなブロックを生成
-    blockchain.push_back(new_block); //ブロックチェーンに追加
-    previous_block = new_block;
-    cout << "a new block has been added to the blcokchain!" << endl;
-    new_block.CheckBlockInfo();
-
-    memset(buf, 0, sizeof(buf));
-    data = read(sock, buf, sizeof(buf));
-    cout << "157:data: " << data << endl;
-    
+    Block current_block;
+    string client_nonce[PLAYERNUM];
     string  snd_str;
-    snd_str=to_string(new_block.index_) + to_string(new_block.timestamp_) + new_block.data_ + new_block.previous_hash_ ;
-    cout<<"block_index"<<snd_str<<endl;
+    int block_num = 3;
 
-    char* cstr = new char[snd_str.size() + 1];
-    strcpy(cstr, snd_str.c_str());
-    sendto(sock,cstr,snd_str.size()+1,0,(struct sockaddr*)&addr,sizeof(addr));
-
-    memset(buf, 0, sizeof(buf));
-    data = read(sock, buf, sizeof(buf));
-    cout << "157:data: " << data << endl;
-
+//    vector<chrono::duration> elapsed_time;
     
+    const string dummy_nonce = "0000";
     
-//string client_nonce;
-    client_nonce=buf;
-//printf("%d, %s\n", data, buf);
-    cout<<"client_nonce: "<<client_nonce<<endl;
-    cout<<"---UPDATE NONCE---"<<client_nonce<<endl;
-//hash(client_nonce);
-
-//nonce の更新
-    previous_block.nonce_=client_nonce;
-    previous_block.hash_=previous_block.GenerateHash();
+    blockchain.push_back(CreateGenesisBlock()); // 最初のブロックを用意、追加
+    cout << "Create genesis Block" << endl;
+    previous_block = blockchain[0];
     previous_block.CheckBlockInfo();
-
+    cout << endl;
+    
 //---blockchain
-    new_block = CreateNextBlock(previous_block,client_nonce); // 最後のブロックを引数に取り新たなブロックを生成
-    blockchain.push_back(new_block); //ブロックチェーンに追加
-    previous_block = new_block;
-    cout << "a new block has been added to the blcokchain!" << endl;
-    new_block.CheckBlockInfo();
-///
+    for (int i = 0; i < block_num; i++) {
+        
 
-    delete[] cstr;
+        for (int team_num = 0; team_num < PLAYERNUM; team_num++) {
 
+            current_block = CreateNextBlock(previous_block, dummy_nonce);
 
+            memset(buf, 0, sizeof(buf));
+            snd_str = to_string(current_block.index_) +
+                to_string(current_block.timestamp_) +
+                current_block.data_ +
+                current_block.previous_hash_;
 
+            //   auto start = std::chrono::system_clock::now();
 
+            sendto(sock[team_num],snd_str.c_str(),snd_str.size()+1,0,
+                   (struct sockaddr*)&addr[team_num],sizeof(addr[team_num]));
 
-
-
-//sendto(sock,"OK.",2,0,(struct sockaddr*)&addr,sizeof(addr));
-//----
-    snd_str=to_string(new_block.index_) + to_string(new_block.timestamp_) + new_block.data_ + new_block.previous_hash_ ;
-    cout<<"block_index"<<snd_str<<endl;
-
-    char* cstr2 = new char[snd_str.size() + 1];
-    strcpy(cstr2, snd_str.c_str());
-    sendto(sock,cstr2,snd_str.size()+1,0,(struct sockaddr*)&addr,sizeof(addr));
-
-    memset(buf, 0, sizeof(buf));
-    data = read(sock, buf, sizeof(buf));
-//string client_nonce;
-    client_nonce=buf;
-//printf("%d, %s\n", data, buf);
-    cout<<"client_nonce: "<<client_nonce<<endl;
-    cout<<"---UPDATE NONCE---"<<client_nonce<<endl;
-//hash(client_nonce);
-    cout<<"debug1"<<endl;
+            memset(buf, 0, sizeof(buf));
+            data = read(sock[team_num], buf, sizeof(buf));
+            //    auto end = std::chrono::system_clock::now();
+            //    auto dur = end - start;
+            // elapsed_time.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(dur).count());
+            client_nonce[team_num]=buf;
+            cout<<"team" << team_num <<" nonce: "<<client_nonce[team_num]
+                //  <<" elapsed_time: " << elapsed_time[team_num] << "msec"
+                << endl;
+        }
 //nonce の更新
-    previous_block.nonce_=client_nonce;
-    previous_block.hash_=previous_block.GenerateHash();
-    previous_block.CheckBlockInfo();
+        current_block.nonce_=client_nonce[0];
+        current_block.hash_=current_block.GenerateHash();
+        current_block.CheckBlockInfo();
 
-    data = read(sock, buf, sizeof(buf));
-    client_nonce=buf;
-
-    new_block = CreateNextBlock(previous_block,client_nonce); // 最後のブロックを引数に取り新たなブロックを生成
-    blockchain.push_back(new_block); //ブロックチェーンに追加
-    previous_block = new_block;
-    cout << "a new block has been added to the blcokchain!" << endl;
-    new_block.CheckBlockInfo();
-
-    delete[] cstr2;
-
+        previous_block = current_block;
+    }
     return 0;
 }
