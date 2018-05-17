@@ -62,6 +62,7 @@ int calc_nonce(string src, int zero_count){
 
     string result_str;
     string cmp_str;
+    string cmp_str2;
     int nonce=rand();
     int count=0;
     bool hash_judge=false;
@@ -69,12 +70,14 @@ int calc_nonce(string src, int zero_count){
         nonce=rand();
         //cout<<"nonce:"<<nonce<<endl;
         cmp_str=src+std::to_string(nonce);
-        picosha2::hash256_hex_string(cmp_str,result_str);
+        picosha2::hash256_hex_string(cmp_str,cmp_str2);
+        picosha2::hash256_hex_string(cmp_str2,result_str);
         count++;
         hash_judge=judge_nonce(result_str,zero_count);
     }
-    cout<<"count"<<count<<endl;
-    cout<<"cmp_str<<"<<cmp_str<<endl;
+    cout << "count: "<< count << endl;
+    cout << "nonce: " << nonce << endl;
+    cout << "hash: "<<result_str<<endl;
 
     auto end = std::chrono::system_clock::now();       // 計測終了時刻を保存
     auto dur = end - start;        // 要した時間を計算
@@ -91,14 +94,14 @@ int main(int argc,char *argv[])
     // 引数: 0の個数、生成するブロック数、IPアドレス
     struct sockaddr_in addr;
     int sock;
-    char buf[128];
+    char buf[256];
     char send_buffer[1024];
-    string nonce="1234";
+    string nonce;
     string dst_ip;
     int dst_port;
-    int block_num;
     int zero_num;
     int data;
+    string team_name;
 
     srand((unsigned) time(NULL));
 
@@ -108,12 +111,11 @@ int main(int argc,char *argv[])
     cout << "dst_port: ";
     cin >> dst_port;
 
-    cout << "block_num: ";
-    cin >> block_num;
-
     cout << "zero_num: ";
     cin >> zero_num;
 
+    cout << "team_name: ";
+    cin >> team_name;
     
     /* ソケットの作成 */
     sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -135,14 +137,14 @@ int main(int argc,char *argv[])
     data = read(sock, buf, sizeof(buf));
     cout << "print debug" << endl;
     /*受信したデータを表示*/
-    printf("%d, %s\n", data, buf);
+    cout << "rcv_msg: " << buf << endl;
+    sendto(sock,team_name.c_str(),team_name.size(),0,(struct sockaddr*)&addr,sizeof(addr));
 
-    // sendto(sock,"query.",5,0,(struct sockaddr*)&addr,sizeof(addr));
-
+    data = read(sock, buf, sizeof(buf));
+    cout << "recv_msg: " << buf << endl;
     int block_loop_count;
     string rcv_str;
-    int b;
-    for(block_loop_count=0;block_loop_count<block_num;block_loop_count++){
+    for(;;){
         memset(buf, 0, sizeof(buf));
         data = read(sock, buf, sizeof(buf));
         printf("%d, %s\n", data, buf);
@@ -150,16 +152,12 @@ int main(int argc,char *argv[])
         //string rcv_str;
         rcv_str=buf;
         cout<<"rcv_str: "<<rcv_str<<endl;
+        if(rcv_str == "FINISH"){
+            break;
+        }
+        nonce=to_string(calc_nonce(rcv_str,zero_num));
 
-        //int b;
-        b=calc_nonce(rcv_str,zero_num);
-        cout<<"b:"<<b<<endl;
-        nonce=to_string(b);
-
-        char* cstr = new char[nonce.size() + 1];
-        strcpy(cstr, nonce.c_str());
-        sendto(sock,cstr,nonce.size()+1,0,(struct sockaddr*)&addr,sizeof(addr));
-        delete[] cstr;
+        sendto(sock,nonce.c_str(),nonce.size()+1,0,(struct sockaddr*)&addr,sizeof(addr));
     }
 
     /* socketの終了 */

@@ -18,10 +18,9 @@
 
 #include <chrono>
 
-const int BUFFER_SIZE = 128;
+const int BUFFER_SIZE = 256;
 const int PLAYERNUM = 2;
-int dst_socket[PLAYERNUM];
-
+const int PORTNUM = 10050;
 
 using namespace std;
 
@@ -30,14 +29,14 @@ class Block{
 public:
     int index_;
     int timestamp_;
-    std::string data_;
-    std::string previous_hash_;
-    std::string hash_;
-    std::string nonce_;
+    string data_;
+    string previous_hash_;
+    string hash_;
+    string nonce_;
 
     Block(){index_ = 0; timestamp_ = 0; data_ = ""; previous_hash_ = "";nonce_ ="";} //メンバ変数の初期化
 
-    Block(int index, int timestamp, std::string data, std::string previous_hash,std::string nonce){
+    Block(int index, int timestamp, string data, string previous_hash,string nonce){
         index_ = index;
         timestamp_ = timestamp;
         data_ = data;
@@ -47,29 +46,29 @@ public:
     }
 
 public:
-    std::string GenerateHash(){
+    string GenerateHash(){
         //ID、タイムスタンプ、データ、一つ前のハッシュ値から新たなハッシュ値を生成する
-        std::string src_str;
-        std::string hash_str;
+        string header;
+        string header_hash;
+        string double_hash;
 
-        src_str = std::to_string(index_) + std::to_string(timestamp_) + data_ + previous_hash_ +nonce_;
-        picosha2::hash256_hex_string(src_str, hash_str);
+        header = to_string(index_) + to_string(timestamp_) + data_ + previous_hash_ + nonce_;
+        picosha2::hash256_hex_string(header, header_hash);
+        picosha2::hash256_hex_string(header_hash, double_hash);
 
-
-        // std::cout << "new hash:  " <<hash_str.front() <<std::endl;
-        return  hash_str;
+        return  double_hash;
     }
 
 public:
     void CheckBlockInfo(){
         //ブロックに保存されている内容を表示する
-        std::cout << "index:         " << index_ << std::endl;
-        std::cout << "timestamp:     " << timestamp_ << std::endl;
-        std::cout << "data:          " << data_ << std::endl;
-        std::cout << "previous hash: " << previous_hash_ << std::endl;
-        std::cout << "nonce: " << nonce_ << std::endl;
-        std::cout << "hash:          " << hash_ << std::endl;
-        std::cout << std::endl;
+        cout << "index:         " << index_ << endl;
+        cout << "timestamp:     " << timestamp_ << endl;
+        cout << "data:          " << data_ << endl;
+        cout << "previous hash: " << previous_hash_ << endl;
+        cout << "nonce: " << nonce_ << endl;
+        cout << "hash:          " << hash_ << endl;
+        cout << endl;
     }
 };
 
@@ -78,13 +77,13 @@ Block CreateGenesisBlock(){
     return genesis_block;
 }
 
-Block CreateNextBlock(Block last_block, std::string nonce){
+Block CreateNextBlock(Block last_block, string nonce){
     int this_index = last_block.index_ + 1;
     int this_timestamp = time(NULL);
-    //std::string this_data = "this is block" + std::to_string(this_index);
-    std::string this_data = std::to_string(this_index);
-    std::string this_hash = last_block.hash_;
-    std::string this_nonce =nonce;
+    string this_data;
+    picosha2::hash256_hex_string(to_string(time(NULL)), this_data);
+    string this_hash = last_block.hash_;
+    string this_nonce =nonce;
 
     Block next_block(this_index, this_timestamp, this_data, this_hash,this_nonce);
     return next_block;
@@ -95,7 +94,7 @@ Block CreateNextBlock(Block last_block, std::string nonce){
 int InitializeSocket(struct sockaddr_in &addr, int port){
     int addr_size;
     int sock;
-;
+    
     /*ソケットの作成(TCP/IP通信)*/
     sock = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -120,36 +119,57 @@ int InitializeSocket(struct sockaddr_in &addr, int port){
     }else{
         cout << "Conneted Clients."<< "\n";
     }
+
+    string connect_message("connection success");
+    cout << "connect_message: " << connect_message << endl;
+    sendto(sock, connect_message.c_str(), connect_message.size()+1,
+           0,(struct sockaddr*)&addr,sizeof(addr));
+    
     return sock;
 }
+
+string ChooseFastestNonce(string* client_nonce, double* elapsed_time){
+    double fastest_time = elapsed_time[0];
+    int fastest_team = 0;
+    for (int i = 1; i < PLAYERNUM; i++) {
+        if(elapsed_time[i] < fastest_time){
+            fastest_time = elapsed_time[i];
+            fastest_team = i;
+        }
+    }
+    return client_nonce[fastest_team];
+}
+
 
 int main(){
     int sock[PLAYERNUM];
     char buf[BUFFER_SIZE];
-    int data;
+    int read_size;
     struct sockaddr_in addr[PLAYERNUM];
     
-
-    for (int i = 0; i < PLAYERNUM; i++) {
-        sock[i] = InitializeSocket(addr[i], 10050+i);
-        string connect_message("Player");
-        connect_message += to_string(i);
-        cout << "connect_message" << connect_message << endl;
-        sendto(sock[i],connect_message.c_str(), connect_message.size()+1,
-               0,(struct sockaddr*)&addr[i],sizeof(addr[i]));
-    }
     vector<Block> blockchain; //ブロックを保持していくための動的配列
     int num_blocks = 5; // ブロックを追加する回数
     Block previous_block;
     Block current_block;
     string client_nonce[PLAYERNUM];
     string  snd_str;
-    int block_num = 3;
+    int block_num;
+    double elapsed_time[PLAYERNUM];
+    vector<string> team_name;
+    const string dummy_nonce = "00000000";
+    
+    cout << "generate_block_num: ";
+    cin >> block_num;
 
-//    vector<chrono::duration> elapsed_time;
-    
-    const string dummy_nonce = "0000";
-    
+    for (int i = 0; i < PLAYERNUM; i++) {
+        sock[i] = InitializeSocket(addr[i], PORTNUM+i);
+        read_size = read(sock[i], buf, sizeof(buf));
+        team_name.push_back(buf);
+        cout << "team " << i << ": " << team_name[i] << endl;
+        sendto(sock[i], "OK", 3, 0,
+               (struct sockaddr*)&addr[i],sizeof(addr[i]));
+    }
+
     blockchain.push_back(CreateGenesisBlock()); // 最初のブロックを用意、追加
     cout << "Create genesis Block" << endl;
     previous_block = blockchain[0];
@@ -158,39 +178,47 @@ int main(){
     
 //---blockchain
     for (int i = 0; i < block_num; i++) {
-        
 
+        current_block = CreateNextBlock(previous_block, dummy_nonce);
         for (int team_num = 0; team_num < PLAYERNUM; team_num++) {
-
-            current_block = CreateNextBlock(previous_block, dummy_nonce);
 
             memset(buf, 0, sizeof(buf));
             snd_str = to_string(current_block.index_) +
                 to_string(current_block.timestamp_) +
                 current_block.data_ +
                 current_block.previous_hash_;
-
-            //   auto start = std::chrono::system_clock::now();
+            auto start = chrono::system_clock::now();
 
             sendto(sock[team_num],snd_str.c_str(),snd_str.size()+1,0,
                    (struct sockaddr*)&addr[team_num],sizeof(addr[team_num]));
 
             memset(buf, 0, sizeof(buf));
-            data = read(sock[team_num], buf, sizeof(buf));
-            //    auto end = std::chrono::system_clock::now();
-            //    auto dur = end - start;
-            // elapsed_time.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(dur).count());
+            read_size = read(sock[team_num], buf, sizeof(buf));
+
+            auto end = chrono::system_clock::now();
+
+            elapsed_time[team_num] = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
             client_nonce[team_num]=buf;
-            cout<<"team" << team_num <<" nonce: "<<client_nonce[team_num]
-                //  <<" elapsed_time: " << elapsed_time[team_num] << "msec"
+            cout<< team_name[team_num] <<": nonce: "<<client_nonce[team_num]
+                <<" elapsed_time: " << elapsed_time[team_num] << "msec"
                 << endl;
         }
-//nonce の更新
-        current_block.nonce_=client_nonce[0];
+
+        string current_nonce = ChooseFastestNonce(client_nonce, elapsed_time);
+        
+        //nonce の更新
+        current_block.nonce_=current_nonce;
         current_block.hash_=current_block.GenerateHash();
         current_block.CheckBlockInfo();
 
         previous_block = current_block;
+
+        blockchain.push_back(current_block);
     }
+    for (int team_num = 0; team_num < PLAYERNUM; team_num++) {
+        sendto(sock[team_num],"FINISH",7,0,
+               (struct sockaddr*)&addr[team_num],sizeof(addr[team_num]));
+    }
+    
     return 0;
 }
