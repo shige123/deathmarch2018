@@ -21,21 +21,10 @@
 #include <vector>
 
 #include <time.h>
-using namespace std;
 
-void hash(string nonce){
-    cout <<"----CALL HASH----"<<endl;
-    string header_hash;
-    string double_hash;
-    string header;
-    //header = version_h + prev_block_h + markle_root_h + timestamp_h + bits_h + nonce_h;
-    header=nonce;
-    cout <<"header:"<< header<<endl;
-    picosha2::hash256_hex_string(header, header_hash);
-    cout<<"header_hash:"<<endl<<header_hash<<endl;
-    picosha2::hash256_hex_string(header_hash, double_hash);
-    cout<<"double_hash:"<<endl<<double_hash<<endl;
-}
+#include<sstream>
+#include<iomanip>
+using namespace std;
 
 bool judge_nonce(string src, int zero_count){
     bool judge=false;
@@ -53,7 +42,7 @@ bool judge_nonce(string src, int zero_count){
     return judge;
 }
 
-int calc_nonce(string src, int zero_count){
+string calc_nonce(string src, int zero_count){
     const int N = 1000*1000;
     std::vector<int> v;
     auto start = std::chrono::system_clock::now();
@@ -63,13 +52,19 @@ int calc_nonce(string src, int zero_count){
     string result_str;
     string cmp_str;
     string cmp_str2;
-    int nonce=rand();
+    int nonce_value;
+    string nonce;
     int count=0;
     bool hash_judge=false;
+    stringstream ss;
     while (hash_judge==false){
-        nonce=rand();
-        //cout<<"nonce:"<<nonce<<endl;
-        cmp_str=src+std::to_string(nonce);
+        nonce_value=rand();
+        ss << setfill('0') << setw(8) << hex << nonce_value;
+        ss >> nonce;
+        ss.str("");
+        ss.clear(stringstream::goodbit);
+        cout<<"nonce:"<<nonce<<endl;
+        cmp_str=src+nonce;
         picosha2::hash256_hex_string(cmp_str,cmp_str2);
         picosha2::hash256_hex_string(cmp_str2,result_str);
         count++;
@@ -111,9 +106,6 @@ int main(int argc,char *argv[])
     cout << "dst_port: ";
     cin >> dst_port;
 
-    cout << "zero_num: ";
-    cin >> zero_num;
-
     cout << "team_name: ";
     cin >> team_name;
     
@@ -142,6 +134,7 @@ int main(int argc,char *argv[])
 
     data = read(sock, buf, sizeof(buf));
     cout << "recv_msg: " << buf << endl;
+    zero_num = stoi(buf);
     int block_loop_count;
     string rcv_str;
     for(;;){
@@ -155,7 +148,7 @@ int main(int argc,char *argv[])
         if(rcv_str == "FINISH"){
             break;
         }
-        nonce=to_string(calc_nonce(rcv_str,zero_num));
+        nonce=calc_nonce(rcv_str,zero_num);
 
         sendto(sock,nonce.c_str(),nonce.size()+1,0,(struct sockaddr*)&addr,sizeof(addr));
     }

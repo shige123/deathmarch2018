@@ -78,8 +78,8 @@ Block CreateGenesisBlock(){
 }
 
 Block CreateNextBlock(Block last_block, string nonce){
-    int this_index = last_block.index_ + 1;
-    int this_timestamp = time(NULL);
+    int32_t this_index = last_block.index_ + 1;
+    int64_t this_timestamp = time(NULL);
     string this_data;
     picosha2::hash256_hex_string(to_string(time(NULL)), this_data);
     string this_hash = last_block.hash_;
@@ -154,19 +154,23 @@ int main(){
     string client_nonce[PLAYERNUM];
     string  snd_str;
     int block_num;
+    string judge_zero_num;
     double elapsed_time[PLAYERNUM];
     vector<string> team_name;
     const string dummy_nonce = "00000000";
     
     cout << "generate_block_num: ";
     cin >> block_num;
+    cout << "judge_zero_num: ";
+    cin >> judge_zero_num;
+    
 
     for (int i = 0; i < PLAYERNUM; i++) {
         sock[i] = InitializeSocket(addr[i], PORTNUM+i);
         read_size = read(sock[i], buf, sizeof(buf));
         team_name.push_back(buf);
         cout << "team " << i << ": " << team_name[i] << endl;
-        sendto(sock[i], "OK", 3, 0,
+        sendto(sock[i], judge_zero_num.c_str(), judge_zero_num.size()+1, 0,
                (struct sockaddr*)&addr[i],sizeof(addr[i]));
     }
 
