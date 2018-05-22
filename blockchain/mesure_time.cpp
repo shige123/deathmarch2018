@@ -18,6 +18,8 @@
 
 #include <chrono>
 
+#include <fstream>
+
 const int BUFFER_SIZE = 256;
 const int PLAYERNUM = 2;
 const int PORTNUM = 10050;
@@ -89,91 +91,101 @@ Block CreateNextBlock(Block last_block, string nonce){
     return next_block;
 }
 
+bool judge_nonce(string src, int zero_count){
+    bool judge=false;
+    int i=0;
+    string judge_str;
+    string zero_count_str;
+    for(i=0;i<zero_count;i++){
+        judge_str.push_back(src[i]);
+        zero_count_str.push_back('0');
+    }
+    //cout<<"judge"<<judge_str<<endl;
+    if(judge_str==zero_count_str){
+        judge=true;
+    }
+    return judge;
+}
+
+string calc_nonce(string src, int zero_count){
+    const int N = 1000*1000;
+    std::vector<int> v;
+    auto start = std::chrono::system_clock::now();
+
+    //    cout<<"CALL calc_nonce: src:"<<src<<endl;
+
+    string result_str;
+    string cmp_str;
+    string cmp_str2;
+    int nonce_value;
+    string nonce;
+    int count=0;
+    bool hash_judge=false;
+    stringstream ss;
+    while (hash_judge==false){
+        nonce_value=rand();
+        ss << setfill('0') << setw(8) << hex << nonce_value;
+        ss >> nonce;
+        ss.str("");
+        ss.clear(stringstream::goodbit);
+        // cout<<"nonce:"<<nonce<<endl;
+        cmp_str=src+nonce;
+        picosha2::hash256_hex_string(cmp_str,cmp_str2);
+        picosha2::hash256_hex_string(cmp_str2,result_str);
+        count++;
+        hash_judge=judge_nonce(result_str,zero_count);
+    }
+    /*
+    cout << "count: "<< count << endl;
+    cout << "nonce: " << nonce << endl;
+    cout << "hash: "<<result_str<<endl;
+    */
+    auto end = std::chrono::system_clock::now();       // 計測終了時刻を保存
+    auto dur = end - start;        // 要した時間を計算
+    auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
+    // 要した時間をミリ秒（1/1000秒）に変換して表示
+    //std::cout << msec << " msec \n";
+
+    return nonce;
+
+}
+
+
 //-------------------------
-
-int InitializeSocket(struct sockaddr_in &addr, int port){
-    int addr_size;
-    int sock;
-    
-    /*ソケットの作成(TCP/IP通信)*/
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-
-    if(sock<0){
-        perror("ERROR opening socket");
-        exit(1);
-    }
-    /*ソケットの設定*/
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = INADDR_ANY;//どれでも要求を受け付ける
-    bind(sock,(struct sockaddr*)&addr, sizeof(addr));
-
-    /*TCPクライアントからの接続要求を持てる状態にする*/
-    listen(sock,1);
-    /*TCPクライアントからの要求を受付*/
-    addr_size = sizeof(addr);
-    sock = accept(sock,(struct sockaddr*)&addr, (socklen_t*)&addr_size);
-    if(sock<0){
-        cout << "Connection Failed. " << "\n";
-        exit(1);
-    }else{
-        cout << "Conneted Clients."<< "\n";
-    }
-
-    string connect_message("connection success");
-    cout << "connect_message: " << connect_message << endl;
-    sendto(sock, connect_message.c_str(), connect_message.size()+1,
-           0,(struct sockaddr*)&addr,sizeof(addr));
-    
-    return sock;
-}
-
-string ChooseFastestNonce(string* client_nonce, double* elapsed_time){
-    double fastest_time = elapsed_time[0];
-    int fastest_team = 0;
-    for (int i = 1; i < PLAYERNUM; i++) {
-        if(elapsed_time[i] < fastest_time){
-            fastest_time = elapsed_time[i];
-            fastest_team = i;
-        }
-    }
-    return client_nonce[fastest_team];
-}
-
 
 int main(){
     int sock[PLAYERNUM];
     char buf[BUFFER_SIZE];
     int read_size;
     struct sockaddr_in addr[PLAYERNUM];
-    
+
     vector<Block> blockchain; //ブロックを保持していくための動的配列
     int num_blocks = 5; // ブロックを追加する回数
     Block previous_block;
     Block current_block;
-    string client_nonce[PLAYERNUM];
-    string  snd_str;
+    string client_nonce;
     int block_num;
+    string input_hash;
     string judge_zero_num;
-    double elapsed_time[PLAYERNUM];
-    vector<string> team_name;
+    string nonce;
+    double elapsed_time;
     const string dummy_nonce = "00000000";
-    
+
     cout << "generate_block_num: ";
     cin >> block_num;
     cout << "judge_zero_num: ";
     cin >> judge_zero_num;
+
+    string output_file_name("./data/zero_");
+    output_file_name += judge_zero_num;
+    output_file_name += "_block_num_";
+    output_file_name += to_string(block_num);
+    output_file_name += ".cvs";
+
+    ofstream ofs(output_file_name);
+
+    ofs << "elapsed time, nonce, hash" << endl;
     
-
-    for (int i = 0; i < PLAYERNUM; i++) {
-        sock[i] = InitializeSocket(addr[i], PORTNUM+i);
-        read_size = read(sock[i], buf, sizeof(buf));
-        team_name.push_back(buf);
-        cout << "team " << i << ": " << team_name[i] << endl;
-        sendto(sock[i], judge_zero_num.c_str(), judge_zero_num.size()+1, 0,
-               (struct sockaddr*)&addr[i],sizeof(addr[i]));
-    }
-
     blockchain.push_back(CreateGenesisBlock()); // 最初のブロックを用意、追加
     cout << "Create genesis Block" << endl;
     previous_block = blockchain[0];
@@ -184,45 +196,34 @@ int main(){
     for (int i = 0; i < block_num; i++) {
 
         current_block = CreateNextBlock(previous_block, dummy_nonce);
-        for (int team_num = 0; team_num < PLAYERNUM; team_num++) {
 
-            memset(buf, 0, sizeof(buf));
-            snd_str = to_string(current_block.index_) +
-                to_string(current_block.timestamp_) +
-                current_block.data_ +
-                current_block.previous_hash_;
-            auto start = chrono::system_clock::now();
+        memset(buf, 0, sizeof(buf));
+        input_hash = to_string(current_block.index_) +
+            to_string(current_block.timestamp_) +
+            current_block.data_ +
+            current_block.previous_hash_;
+        int zero_num = atoi(judge_zero_num.c_str());
+        auto start = chrono::system_clock::now();
 
-            sendto(sock[team_num],snd_str.c_str(),snd_str.size()+1,0,
-                   (struct sockaddr*)&addr[team_num],sizeof(addr[team_num]));
+        nonce=calc_nonce(input_hash,zero_num);
 
-            memset(buf, 0, sizeof(buf));
-            read_size = read(sock[team_num], buf, sizeof(buf));
+        auto end = chrono::system_clock::now();
 
-            auto end = chrono::system_clock::now();
+        elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+        ofs << elapsed_time << ", " << nonce << ", ";
+        cout << elapsed_time << ", " << nonce << ", ";
 
-            elapsed_time[team_num] = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-            client_nonce[team_num]=buf;
-            cout<< team_name[team_num] <<": nonce: "<<client_nonce[team_num]
-                <<" elapsed_time: " << elapsed_time[team_num] << "msec"
-                << endl;
-        }
-
-        string current_nonce = ChooseFastestNonce(client_nonce, elapsed_time);
-        
         //nonce の更新
-        current_block.nonce_=current_nonce;
+        current_block.nonce_=nonce;
         current_block.hash_=current_block.GenerateHash();
-        current_block.CheckBlockInfo();
 
+        ofs << current_block.hash_ << endl;
+        cout << current_block.hash_ << endl;
+        
         previous_block = current_block;
 
         blockchain.push_back(current_block);
     }
-    for (int team_num = 0; team_num < PLAYERNUM; team_num++) {
-        sendto(sock[team_num],"FINISH",7,0,
-               (struct sockaddr*)&addr[team_num],sizeof(addr[team_num]));
-    }
-    
+
     return 0;
 }
